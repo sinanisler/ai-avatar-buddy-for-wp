@@ -1,4 +1,4 @@
-<?php   
+<?php    
 /** 
  * Plugin Name: AI Avatar Buddy for WordPress
  * Plugin URI: https://github.com/sinanisler/ai-avatar-buddy-for-wp
