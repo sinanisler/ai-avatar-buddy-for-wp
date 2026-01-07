@@ -144,6 +144,9 @@ class AI_Avatar_Buddy {
             'enable_custom_input' => true,
             'custom_input_label' => "Ask anything...",
             
+            // Page Display Control
+            'enabled_pages' => '', // Comma-separated page IDs or 'all'
+            
             // Debug
             'debug_mode' => false
         );
@@ -361,6 +364,16 @@ class AI_Avatar_Buddy {
      */
     public function render_avatar() {
         $settings = get_option($this->option_name, $this->get_default_settings());
+        
+        // Check if avatar should display on this page
+        if (!empty($settings['enabled_pages']) && $settings['enabled_pages'] !== 'all') {
+            $enabled_pages = array_map('trim', explode(',', $settings['enabled_pages']));
+            $current_page_id = get_queried_object_id();
+            
+            if (!in_array($current_page_id, $enabled_pages) && !in_array('all', $enabled_pages)) {
+                return; // Don't render avatar on this page
+            }
+        }
         
         // Generate CSS from settings
         ?>
@@ -1546,6 +1559,74 @@ class AI_Avatar_Buddy {
                         </label>
                     </div>
                     
+                    <h2>Page Display Control</h2>
+                    
+                    <div class="aab-setting-row">
+                        <label>Enable Avatar on Specific Pages</label>
+                        <input 
+                            type="text" 
+                            name="enabled_pages" 
+                            id="enabled_pages" 
+                            value="<?php echo esc_attr($settings['enabled_pages']); ?>" 
+                            list="pages-list" 
+                            placeholder="Type 'all' or select pages..."
+                            style="max-width: 100%;"
+                        >
+                        <datalist id="pages-list">
+                            <option value="all">All Pages</option>
+                            <?php
+                            $pages = get_pages(array('sort_column' => 'post_title', 'number' => 1000));
+                            $posts = get_posts(array('post_type' => 'post', 'numberposts' => 100, 'orderby' => 'title', 'order' => 'ASC'));
+                            
+                            if (!empty($pages)) {
+                                echo '<option disabled>--- Pages ---</option>';
+                                foreach ($pages as $page) {
+                                    echo '<option value="' . esc_attr($page->ID) . '">' . esc_html($page->post_title) . ' (ID: ' . $page->ID . ')</option>';
+                                }
+                            }
+                            
+                            if (!empty($posts)) {
+                                echo '<option disabled>--- Posts ---</option>';
+                                foreach ($posts as $post) {
+                                    echo '<option value="' . esc_attr($post->ID) . '">' . esc_html($post->post_title) . ' (ID: ' . $post->ID . ')</option>';
+                                }
+                            }
+                            ?>
+                        </datalist>
+                        <p class="description">
+                            Enter 'all' to show on all pages, or enter page IDs separated by commas (e.g., "5, 12, 23").<br>
+                            Use the dropdown to select pages easily. Selected page IDs will be added automatically.
+                        </p>
+                        <?php
+                        // Show currently selected pages
+                        if (!empty($settings['enabled_pages']) && $settings['enabled_pages'] !== 'all') {
+                            $enabled_ids = array_map('trim', explode(',', $settings['enabled_pages']));
+                            $enabled_ids = array_filter($enabled_ids, 'is_numeric');
+                            if (!empty($enabled_ids)) {
+                                echo '<div style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-left: 3px solid #0073aa;">';
+                                echo '<strong>Currently enabled on:</strong><ul style="margin: 5px 0;">';
+                                foreach ($enabled_ids as $page_id) {
+                                    $page = get_post($page_id);
+                                    if ($page) {
+                                        echo '<li>' . esc_html($page->post_title) . ' (ID: ' . $page_id . ') - <a href="' . get_permalink($page_id) . '" target="_blank">View</a></li>';
+                                    } else {
+                                        echo '<li>Page ID: ' . esc_html($page_id) . ' (not found)</li>';
+                                    }
+                                }
+                                echo '</ul></div>';
+                            }
+                        } elseif ($settings['enabled_pages'] === 'all') {
+                            echo '<div style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-left: 3px solid #0073aa;">';
+                            echo '<strong>Avatar is enabled on ALL pages</strong>';
+                            echo '</div>';
+                        } else {
+                            echo '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 3px solid #ffc107;">';
+                            echo '<strong>⚠️ No pages selected - Avatar will show on all pages by default</strong>';
+                            echo '</div>';
+                        }
+                        ?>
+                    </div>
+                    
                     <h2>Debug Settings</h2>
                     
                     <div class="aab-setting-row">
@@ -1755,6 +1836,40 @@ class AI_Avatar_Buddy {
                 $('.aab-tab-content').removeClass('active');
                 $('[data-tab-content="' + tab + '"]').addClass('active');
             });
+            
+            // Handle page selection from datalist
+            $('#enabled_pages').on('input', function() {
+                const input = $(this);
+                const val = input.val().trim();
+                
+                // Check if user selected from datalist
+                const option = $('#pages-list option[value="' + val + '"]');
+                if (option.length) {
+                    const currentVal = input.val();
+                    
+                    // If 'all' is selected, just set it
+                    if (currentVal === 'all') {
+                        return;
+                    }
+                    
+                    // Get existing page IDs
+                    let existingVal = input.attr('data-selected') || '';
+                    let pageIds = existingVal.split(',').map(id => id.trim()).filter(id => id && id !== 'all');
+                    
+                    // Add new ID if not already present
+                    if (!pageIds.includes(currentVal)) {
+                        pageIds.push(currentVal);
+                    }
+                    
+                    // Update the input
+                    const newVal = pageIds.join(', ');
+                    input.val(newVal);
+                    input.attr('data-selected', newVal);
+                }
+            });
+            
+            // Initialize data-selected attribute
+            $('#enabled_pages').attr('data-selected', $('#enabled_pages').val());
         });
         </script>
         <?php
