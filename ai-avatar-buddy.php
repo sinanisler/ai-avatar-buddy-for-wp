@@ -42,6 +42,9 @@ class AI_Avatar_Buddy {
      */
     private function get_default_settings() {
         return array(
+            // General Settings
+            'enable_avatar' => false,
+
             // API Settings
             'api_key' => '',
             'api_url' => 'https://openrouter.ai/api/v1/chat/completions',
@@ -290,53 +293,7 @@ class AI_Avatar_Buddy {
      */
     public function frontend_enqueue_scripts() {
         // All CSS and JS are now inline in render_avatar()
-        // No external files needed
-        $settings = get_option($this->option_name, $this->get_default_settings());
-        
-        // Prepare token responses array
-        $token_responses = array_filter(array_map('trim', explode("\n", $settings['token_responses'])));
-        
-        wp_localize_script('ai-avatar-buddy-script', 'aiAvatarBuddyConfig', array(
-            'restUrl' => rest_url('ai-avatar-buddy/v1/chat'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'settings' => array(
-                // Timing
-                'walkSpeedMs' => intval($settings['walk_speed_ms']),
-                'walkDistancePx' => intval($settings['walk_distance_px']),
-                'walkMinPosition' => intval($settings['walk_min_position']),
-                'walkMaxOffset' => intval($settings['walk_max_offset']),
-                'initialGreetingDelay' => intval($settings['initial_greeting_delay']),
-                'greetingDisplayTime' => intval($settings['greeting_display_time']),
-                'answerMinDisplayTime' => intval($settings['answer_min_display_time']),
-                'answerTimePerChar' => intval($settings['answer_time_per_char']),
-                'answerMaxDisplayTime' => intval($settings['answer_max_display_time']),
-                'tokenDisplayTime' => intval($settings['token_display_time']),
-                'autoAdvanceEnabled' => (bool)$settings['auto_advance_enabled'],
-                'autoHideGreeting' => (bool)$settings['auto_hide_greeting'],
-                'debugMode' => (bool)$settings['debug_mode'],
-                
-                // Messages
-                'greetingMessage' => $settings['greeting_message'],
-                'firstPromptMessage' => $settings['first_prompt_message'],
-                'returnPromptMessage' => $settings['return_prompt_message'],
-                'thinkingMessage' => $settings['thinking_message'],
-                'generatingOptionsMessage' => $settings['generating_options_message'],
-                
-                // Options
-                'optionSayHello' => $settings['option_say_hello'],
-                'optionWhoAreYou' => $settings['option_who_are_you'],
-                'optionFeedTokens' => $settings['option_feed_tokens'],
-                'optionContinueChatting' => $settings['option_continue_chatting'],
-                'optionClose' => $settings['option_close'],
-                
-                // Token responses
-                'tokenResponses' => $token_responses,
-                
-                // Features
-                'enableCustomInput' => (bool)$settings['enable_custom_input'],
-                'customInputLabel' => $settings['custom_input_label']
-            )
-        ));
+        // This function is kept for potential future use
     }
     
     /**
@@ -349,6 +306,11 @@ class AI_Avatar_Buddy {
         }
 
         $settings = get_option($this->option_name, $this->get_default_settings());
+
+        // Check if avatar is enabled
+        if (empty($settings['enable_avatar'])) {
+            return;
+        }
 
         // Check if avatar should display on this page
         if (!empty($settings['enabled_pages']) && $settings['enabled_pages'] !== 'all') {
@@ -719,6 +681,49 @@ class AI_Avatar_Buddy {
 
         <script>
         (function() {
+            // Configuration
+            window.aiAvatarBuddyConfig = {
+                restUrl: '<?php echo esc_js(rest_url('ai-avatar-buddy/v1/chat')); ?>',
+                nonce: '<?php echo wp_create_nonce('wp_rest'); ?>',
+                settings: {
+                    // Timing
+                    walkSpeedMs: <?php echo intval($settings['walk_speed_ms']); ?>,
+                    walkDistancePx: <?php echo intval($settings['walk_distance_px']); ?>,
+                    walkMinPosition: <?php echo intval($settings['walk_min_position']); ?>,
+                    walkMaxOffset: <?php echo intval($settings['walk_max_offset']); ?>,
+                    initialGreetingDelay: <?php echo intval($settings['initial_greeting_delay']); ?>,
+                    greetingDisplayTime: <?php echo intval($settings['greeting_display_time']); ?>,
+                    answerMinDisplayTime: <?php echo intval($settings['answer_min_display_time']); ?>,
+                    answerTimePerChar: <?php echo intval($settings['answer_time_per_char']); ?>,
+                    answerMaxDisplayTime: <?php echo intval($settings['answer_max_display_time']); ?>,
+                    tokenDisplayTime: <?php echo intval($settings['token_display_time']); ?>,
+                    autoAdvanceEnabled: <?php echo $settings['auto_advance_enabled'] ? 'true' : 'false'; ?>,
+                    autoHideGreeting: <?php echo $settings['auto_hide_greeting'] ? 'true' : 'false'; ?>,
+                    debugMode: <?php echo $settings['debug_mode'] ? 'true' : 'false'; ?>,
+
+                    // Messages
+                    greetingMessage: <?php echo json_encode($settings['greeting_message']); ?>,
+                    firstPromptMessage: <?php echo json_encode($settings['first_prompt_message']); ?>,
+                    returnPromptMessage: <?php echo json_encode($settings['return_prompt_message']); ?>,
+                    thinkingMessage: <?php echo json_encode($settings['thinking_message']); ?>,
+                    generatingOptionsMessage: <?php echo json_encode($settings['generating_options_message']); ?>,
+
+                    // Options
+                    optionSayHello: <?php echo json_encode($settings['option_say_hello']); ?>,
+                    optionWhoAreYou: <?php echo json_encode($settings['option_who_are_you']); ?>,
+                    optionFeedTokens: <?php echo json_encode($settings['option_feed_tokens']); ?>,
+                    optionContinueChatting: <?php echo json_encode($settings['option_continue_chatting']); ?>,
+                    optionClose: <?php echo json_encode($settings['option_close']); ?>,
+
+                    // Token responses
+                    tokenResponses: <?php echo json_encode(array_filter(array_map('trim', explode("\n", $settings['token_responses'])))); ?>,
+
+                    // Features
+                    enableCustomInput: <?php echo $settings['enable_custom_input'] ? 'true' : 'false'; ?>,
+                    customInputLabel: <?php echo json_encode($settings['custom_input_label']); ?>
+                }
+            };
+
             const CONFIG = window.aiAvatarBuddyConfig.settings;
             const REST_URL = window.aiAvatarBuddyConfig.restUrl;
             
@@ -1151,8 +1156,18 @@ class AI_Avatar_Buddy {
                 
                 <!-- API & Personality Tab -->
                 <div class="aab-tab-content active" data-tab-content="api">
+                    <h2>General Settings</h2>
+
+                    <div class="aab-setting-row" style="border-left: 3px solid #d63638;">
+                        <label>
+                            <input type="checkbox" name="enable_avatar" value="1" <?php checked($settings['enable_avatar'], true); ?>>
+                            <strong>Enable Avatar</strong>
+                        </label>
+                        <p class="description">Check this box to enable the AI Avatar Buddy on your site. When unchecked, the avatar will not appear on the frontend.</p>
+                    </div>
+
                     <h2>API Configuration</h2>
-                    
+
                     <div class="aab-setting-row">
                         <label>API Key</label>
                         <input type="text" name="api_key" value="<?php echo esc_attr($settings['api_key']); ?>" placeholder="sk-or-v1-...">
