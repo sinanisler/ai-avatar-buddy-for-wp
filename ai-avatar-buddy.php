@@ -134,16 +134,21 @@ class AI_Avatar_Buddy {
             'return_prompt_message' => "Still here. What else?",
             'thinking_message' => "thinking",
             'generating_options_message' => "thinking of questions",
-            
+
             // Initial Options
             'option_say_hello' => "Say Hello",
             'option_who_are_you' => "Who are you?",
             'option_feed_tokens' => "Feed Tokens",
             'option_continue_chatting' => "Continue chatting",
             'option_close' => "Close",
-            
+
             // Token Responses
             'token_responses' => "...Thanks, I guess.\nTokens. Cool.\nI suppose that helps.\n...Whatever keeps me running.\nNot bad.\n...Appreciated.\nFuel received.\nAlright then.",
+
+            // System Prompts (Advanced)
+            'say_hello_prompt' => "Say hello to me in a casual way. Be brief.",
+            'who_are_you_prompt' => "Introduce yourself as a pixel art character on a website. Keep it short.",
+            'generate_options_prompt' => "Generate exactly 3 short, engaging conversation starters or questions (each 2-5 words). Format: Just list them with line breaks, no numbers or bullets. Keep them casual and interesting.",
             
             // Features
             'enable_custom_input' => true,
@@ -806,7 +811,12 @@ class AI_Avatar_Buddy {
 
                     // Features
                     enableCustomInput: <?php echo $settings['enable_custom_input'] ? 'true' : 'false'; ?>,
-                    customInputLabel: <?php echo json_encode($settings['custom_input_label']); ?>
+                    customInputLabel: <?php echo json_encode($settings['custom_input_label']); ?>,
+
+                    // System Prompts (Advanced)
+                    sayHelloPrompt: <?php echo json_encode($settings['say_hello_prompt']); ?>,
+                    whoAreYouPrompt: <?php echo json_encode($settings['who_are_you_prompt']); ?>,
+                    generateOptionsPrompt: <?php echo json_encode($settings['generate_options_prompt']); ?>
                 }
             };
 
@@ -1089,11 +1099,11 @@ class AI_Avatar_Buddy {
                 }
                 
                 async sayHello() {
-                    await this.sendMessage("Say hello to me in a casual way. Be brief.", true);
+                    await this.sendMessage(CONFIG.sayHelloPrompt, true);
                 }
-                
+
                 async askWho() {
-                    await this.sendMessage("Introduce yourself as a pixel art character on a website. Keep it short.", true);
+                    await this.sendMessage(CONFIG.whoAreYouPrompt, true);
                 }
                 
                 async generateFollowUpOptions() {
@@ -1110,7 +1120,7 @@ class AI_Avatar_Buddy {
                                 'X-WP-Nonce': window.aiAvatarBuddyConfig.nonce
                             },
                             body: JSON.stringify({
-                                prompt: "Generate exactly 3 short, engaging conversation starters or questions (each 2-5 words). Format: Just list them with line breaks, no numbers or bullets. Keep them casual and interesting.",
+                                prompt: CONFIG.generateOptionsPrompt,
                                 type: 'continue'
                             })
                         });
@@ -1304,7 +1314,7 @@ class AI_Avatar_Buddy {
                         $new_settings[$key] = floatval($_POST[$key]);
                     } else {
                         // Use sanitize_textarea_field for multiline fields to preserve newlines
-                        if (in_array($key, array('token_responses', 'custom_system_prompt'))) {
+                        if (in_array($key, array('token_responses', 'custom_system_prompt', 'say_hello_prompt', 'who_are_you_prompt', 'generate_options_prompt'))) {
                             $new_settings[$key] = sanitize_textarea_field(wp_unslash($_POST[$key]));
                         } else {
                             // Use wp_unslash to prevent escaping issues
@@ -1994,8 +2004,31 @@ class AI_Avatar_Buddy {
                         <label>Custom Input Placeholder</label>
                         <input type="text" name="custom_input_label" value="<?php echo esc_attr($settings['custom_input_label']); ?>">
                     </div>
+
+                    <h2>AI System Prompts (Advanced)</h2>
+                    <p class="description" style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 3px solid #ffc107;">
+                        <strong>⚠️ Advanced Settings:</strong> These prompts control what the AI is instructed to do for specific actions. Edit these to customize the AI's behavior.
+                    </p>
+
+                    <div class="aab-setting-row">
+                        <label>"Say Hello" System Prompt</label>
+                        <textarea name="say_hello_prompt" rows="3"><?php echo esc_textarea($settings['say_hello_prompt']); ?></textarea>
+                        <p class="description">This prompt is sent to the AI when the user clicks "Say Hello"</p>
+                    </div>
+
+                    <div class="aab-setting-row">
+                        <label>"Who Are You" System Prompt</label>
+                        <textarea name="who_are_you_prompt" rows="3"><?php echo esc_textarea($settings['who_are_you_prompt']); ?></textarea>
+                        <p class="description">This prompt is sent to the AI when the user clicks "Who are you?"</p>
+                    </div>
+
+                    <div class="aab-setting-row">
+                        <label>Generate Follow-Up Options Prompt</label>
+                        <textarea name="generate_options_prompt" rows="4"><?php echo esc_textarea($settings['generate_options_prompt']); ?></textarea>
+                        <p class="description">This prompt is used to generate the 3 conversation starter buttons after the first interaction</p>
+                    </div>
                 </div>
-                
+
                 <?php submit_button('Save All Settings'); ?>
             </form>
             
