@@ -61,6 +61,8 @@ class AI_Avatar_Buddy {
             'avatar_initial_left' => 50,
             'avatar_initial_bottom' => 10,
             'avatar_z_index' => 1000,
+            'avatar_position_side' => 'left', // 'left' or 'right'
+            'enable_walking' => false,
             
             // Avatar Colors
             'avatar_skin_color' => '#8b7355',
@@ -323,6 +325,8 @@ class AI_Avatar_Buddy {
         }
         
         // Generate CSS from settings
+        $position_side = isset($settings['avatar_position_side']) ? $settings['avatar_position_side'] : 'left';
+        $bubble_alignment = ($position_side === 'right') ? 'right' : 'left';
         ?>
         <style>
             :root {
@@ -331,6 +335,8 @@ class AI_Avatar_Buddy {
                 --avatar-initial-left: <?php echo intval($settings['avatar_initial_left']); ?>px;
                 --avatar-initial-bottom: <?php echo intval($settings['avatar_initial_bottom']); ?>px;
                 --avatar-z-index: <?php echo intval($settings['avatar_z_index']); ?>;
+                --avatar-position-side: <?php echo $position_side; ?>;
+                --bubble-alignment: <?php echo $bubble_alignment; ?>;
                 
                 /* Avatar Colors */
                 --avatar-skin-color: <?php echo esc_attr($settings['avatar_skin_color']); ?>;
@@ -382,15 +388,27 @@ class AI_Avatar_Buddy {
             .avatar-container {
                 position: fixed;
                 bottom: var(--avatar-initial-bottom);
-                left: var(--avatar-initial-left);
                 width: var(--avatar-size);
                 height: var(--avatar-size);
                 z-index: var(--avatar-z-index);
                 cursor: pointer;
-                transition: left 2s linear;
                 image-rendering: pixelated;
                 image-rendering: -moz-crisp-edges;
                 image-rendering: crisp-edges;
+            }
+
+            .avatar-container.position-left {
+                left: var(--avatar-initial-left);
+                transition: left 2s linear;
+            }
+
+            .avatar-container.position-right {
+                right: var(--avatar-initial-left);
+                transition: right 2s linear;
+            }
+
+            .avatar-container.position-right .avatar {
+                transform: scaleX(-1);
             }
 
             .avatar {
@@ -482,7 +500,6 @@ class AI_Avatar_Buddy {
             .speech-bubble {
                 position: absolute;
                 bottom: var(--bubble-bottom-offset);
-                left: var(--bubble-left-offset);
                 background: var(--bubble-bg-color);
                 border: var(--bubble-border-width) solid var(--bubble-border-color);
                 border-radius: var(--bubble-border-radius);
@@ -497,13 +514,21 @@ class AI_Avatar_Buddy {
                 image-rendering: pixelated;
             }
 
+            .avatar-container.position-left .speech-bubble {
+                left: var(--bubble-left-offset);
+            }
+
+            .avatar-container.position-right .speech-bubble {
+                right: var(--bubble-left-offset);
+            }
+
             .speech-bubble.show {
                 opacity: 1;
                 transform: translateY(0);
                 pointer-events: auto;
             }
 
-            .speech-bubble::after {
+            .avatar-container.position-left .speech-bubble::after {
                 content: '';
                 position: absolute;
                 bottom: -12px;
@@ -515,11 +540,35 @@ class AI_Avatar_Buddy {
                 border-top: 12px solid var(--bubble-bg-color);
             }
 
-            .speech-bubble::before {
+            .avatar-container.position-left .speech-bubble::before {
                 content: '';
                 position: absolute;
                 bottom: -15px;
                 left: 38px;
+                width: 0;
+                height: 0;
+                border-left: 14px solid transparent;
+                border-right: 14px solid transparent;
+                border-top: 14px solid var(--bubble-border-color);
+            }
+
+            .avatar-container.position-right .speech-bubble::after {
+                content: '';
+                position: absolute;
+                bottom: -12px;
+                right: 40px;
+                width: 0;
+                height: 0;
+                border-left: 12px solid transparent;
+                border-right: 12px solid transparent;
+                border-top: 12px solid var(--bubble-bg-color);
+            }
+
+            .avatar-container.position-right .speech-bubble::before {
+                content: '';
+                position: absolute;
+                bottom: -15px;
+                right: 38px;
                 width: 0;
                 height: 0;
                 border-left: 14px solid transparent;
@@ -687,8 +736,8 @@ class AI_Avatar_Buddy {
                 60%, 100% { content: '...'; }
             }
         </style>
-        
-        <div class="avatar-container" id="avatarContainer">
+
+        <div class="avatar-container position-<?php echo esc_attr($position_side); ?>" id="avatarContainer">
             <div class="avatar" id="avatar">
                 <div class="avatar-body">
                     <div class="pixel-head">
@@ -719,6 +768,10 @@ class AI_Avatar_Buddy {
                 restUrl: '<?php echo esc_js(rest_url('ai-avatar-buddy/v1/chat')); ?>',
                 nonce: '<?php echo wp_create_nonce('wp_rest'); ?>',
                 settings: {
+                    // Position & Movement
+                    positionSide: <?php echo json_encode($position_side); ?>,
+                    enableWalking: <?php echo isset($settings['enable_walking']) && $settings['enable_walking'] ? 'true' : 'false'; ?>,
+
                     // Timing
                     walkSpeedMs: <?php echo intval($settings['walk_speed_ms']); ?>,
                     walkDistancePx: <?php echo intval($settings['walk_distance_px']); ?>,
@@ -920,22 +973,41 @@ class AI_Avatar_Buddy {
                 }
                 
                 startWalking() {
+                    if (!CONFIG.enableWalking) {
+                        return; // Walking disabled, stay in place
+                    }
+
                     this.isWalking = true;
                     this.avatar.classList.add('walking');
-                    
+
                     setInterval(() => {
                         this.position += this.direction * CONFIG.walkDistancePx;
-                        
+
                         const maxPosition = window.innerWidth - CONFIG.walkMaxOffset;
                         if (this.position >= maxPosition) {
                             this.direction = -1;
-                            this.avatar.style.transform = 'scaleX(-1)';
+                            // Only flip if on left side (right side is already flipped in CSS)
+                            if (CONFIG.positionSide === 'left') {
+                                this.avatar.style.transform = 'scaleX(-1)';
+                            } else {
+                                this.avatar.style.transform = 'scaleX(1)';
+                            }
                         } else if (this.position <= CONFIG.walkMinPosition) {
                             this.direction = 1;
-                            this.avatar.style.transform = 'scaleX(1)';
+                            // Only flip if on left side (right side is already flipped in CSS)
+                            if (CONFIG.positionSide === 'left') {
+                                this.avatar.style.transform = 'scaleX(1)';
+                            } else {
+                                this.avatar.style.transform = 'scaleX(-1)';
+                            }
                         }
-                        
-                        this.container.style.left = this.position + 'px';
+
+                        // Update position based on side
+                        if (CONFIG.positionSide === 'left') {
+                            this.container.style.left = this.position + 'px';
+                        } else {
+                            this.container.style.right = this.position + 'px';
+                        }
                     }, CONFIG.walkSpeedMs);
                 }
                 
@@ -1677,8 +1749,27 @@ class AI_Avatar_Buddy {
                 
                 <!-- Behavior & Timing Tab -->
                 <div class="aab-tab-content" data-tab-content="behavior">
-                    <h2>Walking Behavior</h2>
-                    
+                    <h2>Position & Movement</h2>
+
+                    <div class="aab-setting-row">
+                        <label>Avatar Position Side</label>
+                        <select name="avatar_position_side">
+                            <option value="left" <?php selected($settings['avatar_position_side'], 'left'); ?>>Left Side</option>
+                            <option value="right" <?php selected($settings['avatar_position_side'], 'right'); ?>>Right Side</option>
+                        </select>
+                        <p class="description">Choose which side of the screen the avatar appears on. Speech bubble will automatically adjust.</p>
+                    </div>
+
+                    <div class="aab-setting-row">
+                        <label>
+                            <input type="checkbox" name="enable_walking" value="1" <?php checked($settings['enable_walking'], true); ?>>
+                            <strong>Enable Walking Animation</strong>
+                        </label>
+                        <p class="description">When enabled, the avatar will walk back and forth. When disabled, it stays in one place.</p>
+                    </div>
+
+                    <h2>Walking Behavior (only applies when walking is enabled)</h2>
+
                     <div class="aab-setting-row">
                         <label>Walk Speed (milliseconds)</label>
                         <input type="number" name="walk_speed_ms" value="<?php echo esc_attr($settings['walk_speed_ms']); ?>">
