@@ -778,23 +778,79 @@ class AI_Avatar_Buddy {
                     this.speechText = document.getElementById('speechText');
                     this.optionsDiv = document.getElementById('speechOptions');
                     this.stateIndicator = document.getElementById('stateIndicator');
-                    
+
                     this.currentState = BUBBLE_STATE.IDLE;
                     this.stateTimeout = null;
                     this.lastClickTime = 0;
-                    
+
                     this.isWalking = false;
                     this.direction = 1;
                     this.position = CONFIG.walkMinPosition;
-                    
+
                     this.tokens = 0;
                     this.hasInteracted = false;
-                    
+
+                    // Conversation history
+                    this.conversationHistory = this.loadHistory();
+
                     if (CONFIG.debugMode) {
                         this.stateIndicator.style.display = 'block';
                     }
-                    
+
                     this.init();
+                }
+
+                loadHistory() {
+                    try {
+                        const stored = localStorage.getItem('aiAvatarBuddyHistory');
+                        return stored ? JSON.parse(stored) : [];
+                    } catch (e) {
+                        console.error('Failed to load conversation history:', e);
+                        return [];
+                    }
+                }
+
+                saveHistory() {
+                    try {
+                        localStorage.setItem('aiAvatarBuddyHistory', JSON.stringify(this.conversationHistory));
+                    } catch (e) {
+                        console.error('Failed to save conversation history:', e);
+                    }
+                }
+
+                addToHistory(type, userMessage, avatarResponse) {
+                    const entry = {
+                        timestamp: new Date().toISOString(),
+                        type: type, // 'button', 'custom', 'greeting'
+                        userMessage: userMessage,
+                        avatarResponse: avatarResponse
+                    };
+
+                    this.conversationHistory.push(entry);
+
+                    // Keep only last 50 entries to avoid localStorage limits
+                    if (this.conversationHistory.length > 50) {
+                        this.conversationHistory = this.conversationHistory.slice(-50);
+                    }
+
+                    this.saveHistory();
+
+                    if (CONFIG.debugMode) {
+                        console.log('History updated:', entry);
+                    }
+                }
+
+                getConversationContext() {
+                    // Get last 5 exchanges for context
+                    const recentHistory = this.conversationHistory.slice(-5);
+                    if (recentHistory.length === 0) return '';
+
+                    let context = '\n\nPrevious conversation context:\n';
+                    recentHistory.forEach(entry => {
+                        context += `User: ${entry.userMessage}\nAvatar: ${entry.avatarResponse}\n`;
+                    });
+
+                    return context;
                 }
                 
                 init() {
@@ -1075,12 +1131,15 @@ class AI_Avatar_Buddy {
                 async sendMessage(prompt, isInitial) {
                     this.clearStateTimeout();
                     this.setState(BUBBLE_STATE.THINKING);
-                    
+
                     this.speechText.innerHTML = '<span class="loading">' + CONFIG.thinkingMessage + '</span>';
                     this.optionsDiv.innerHTML = '';
                     this.showBubble();
-                    
+
                     try {
+                        // Add conversation context to the prompt
+                        const contextualPrompt = prompt + this.getConversationContext();
+
                         const response = await fetch(REST_URL, {
                             method: 'POST',
                             headers: {
@@ -1088,24 +1147,28 @@ class AI_Avatar_Buddy {
                                 'X-WP-Nonce': window.aiAvatarBuddyConfig.nonce
                             },
                             body: JSON.stringify({
-                                prompt: prompt,
+                                prompt: contextualPrompt,
                                 type: isInitial ? 'initial' : 'continue'
                             })
                         });
-                        
+
                         if (!response.ok) {
                             throw new Error('API request failed');
                         }
-                        
+
                         const data = await response.json();
-                        
+
                         if (data.success && data.answer) {
                             this.hasInteracted = true;
+
+                            // Save to conversation history
+                            this.addToHistory('chat', prompt, data.answer);
+
                             this.showAnswer(data.answer);
                         } else {
                             throw new Error('Invalid response');
                         }
-                        
+
                     } catch (error) {
                         console.error('API Error:', error);
                         this.setState(BUBBLE_STATE.OPTIONS);
@@ -1121,9 +1184,13 @@ class AI_Avatar_Buddy {
                     this.tokens += 10;
                     const responses = CONFIG.tokenResponses;
                     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                    this.speechText.textContent = randomResponse + ` Total: ${this.tokens}`;
+                    const fullResponse = randomResponse + ` Total: ${this.tokens}`;
+                    this.speechText.textContent = fullResponse;
                     this.optionsDiv.innerHTML = '';
                     this.showBubble();
+
+                    // Save token feeding to history
+                    this.addToHistory('token', 'Fed tokens (+10)', fullResponse);
 
                     this.stateTimeout = setTimeout(() => {
                         if (this.currentState === BUBBLE_STATE.TOKEN_RESPONSE) {
