@@ -210,12 +210,6 @@ class AI_Avatar_Buddy {
         
         wp_enqueue_style('wp-color-picker');
         wp_enqueue_script('wp-color-picker');
-        wp_enqueue_style(
-            'ai-avatar-buddy-admin',
-            plugin_dir_url(__FILE__) . 'admin-style.css',
-            array(),
-            '1.0.0'
-        );
     }
     
     /**
@@ -295,22 +289,8 @@ class AI_Avatar_Buddy {
      * Enqueue frontend scripts
      */
     public function frontend_enqueue_scripts() {
-        wp_enqueue_style(
-            'ai-avatar-buddy-style',
-            plugin_dir_url(__FILE__) . 'style.css',
-            array(),
-            '1.0.0'
-        );
-        
-        wp_enqueue_script(
-            'ai-avatar-buddy-script',
-            plugin_dir_url(__FILE__) . 'script.js',
-            array(),
-            '1.0.0',
-            true
-        );
-        
-        // Pass settings to JS
+        // All CSS and JS are now inline in render_avatar()
+        // No external files needed
         $settings = get_option($this->option_name, $this->get_default_settings());
         
         // Prepare token responses array
@@ -1058,7 +1038,8 @@ class AI_Avatar_Buddy {
                     } elseif (is_numeric($default_value)) {
                         $new_settings[$key] = floatval($_POST[$key]);
                     } else {
-                        $new_settings[$key] = sanitize_text_field($_POST[$key]);
+                        // Use wp_unslash to prevent escaping issues
+                        $new_settings[$key] = sanitize_text_field(wp_unslash($_POST[$key]));
                     }
                 } else {
                     $new_settings[$key] = is_bool($default_value) ? false : $default_value;
@@ -1721,12 +1702,13 @@ class AI_Avatar_Buddy {
             
             <!-- Live Preview -->
             <div class="aab-preview">
-                <h3>Preview</h3>
-                <p style="font-size: 11px; color: #666;">Live preview coming when you click avatar on frontend</p>
-                <div class="aab-preview-avatar" style="
+                <h3>Live Preview</h3>
+                <p style="font-size: 11px; color: #666; margin: 5px 0;">Changes update in real-time!</p>
+                <div class="aab-preview-avatar" id="previewAvatarContainer" style="
                     width: <?php echo intval($settings['avatar_size']); ?>px;
                     height: <?php echo intval($settings['avatar_size']); ?>px;
                     position: relative;
+                    margin: 20px auto;
                 ">
                     <div style="
                         width: 48px;
@@ -1736,15 +1718,19 @@ class AI_Avatar_Buddy {
                         left: 50%;
                         transform: translateX(-50%);
                     ">
-                        <div style="
+                        <div id="previewHead" style="
                             width: 32px;
                             height: 32px;
                             background: <?php echo esc_attr($settings['avatar_skin_color']); ?>;
                             position: absolute;
                             top: 0;
                             left: 8px;
+                            box-shadow: 
+                                0 -4px 0 0 <?php echo esc_attr($settings['avatar_skin_shadow']); ?>,
+                                -4px 0 0 0 <?php echo esc_attr($settings['avatar_skin_shadow']); ?>,
+                                4px 0 0 0 <?php echo esc_attr($settings['avatar_skin_shadow']); ?>;
                         ">
-                            <div style="
+                            <div id="previewEyeLeft" style="
                                 width: 6px;
                                 height: 6px;
                                 background: <?php echo esc_attr($settings['avatar_eye_color']); ?>;
@@ -1752,7 +1738,7 @@ class AI_Avatar_Buddy {
                                 top: 12px;
                                 left: 6px;
                             "></div>
-                            <div style="
+                            <div id="previewEyeRight" style="
                                 width: 6px;
                                 height: 6px;
                                 background: <?php echo esc_attr($settings['avatar_eye_color']); ?>;
@@ -1760,7 +1746,7 @@ class AI_Avatar_Buddy {
                                 top: 12px;
                                 right: 6px;
                             "></div>
-                            <div style="
+                            <div id="previewMouth" style="
                                 width: 12px;
                                 height: 2px;
                                 background: <?php echo esc_attr($settings['avatar_mouth_color']); ?>;
@@ -1769,15 +1755,34 @@ class AI_Avatar_Buddy {
                                 left: 10px;
                             "></div>
                         </div>
-                        <div style="
+                        <div id="previewTorso" style="
                             width: 32px;
                             height: 24px;
                             background: <?php echo esc_attr($settings['avatar_torso_color']); ?>;
                             position: absolute;
                             top: 32px;
                             left: 8px;
+                            box-shadow: 
+                                -4px 0 0 0 <?php echo esc_attr($settings['avatar_torso_shadow']); ?>,
+                                4px 0 0 0 <?php echo esc_attr($settings['avatar_torso_shadow']); ?>;
                         "></div>
-                        <div style="
+                        <div id="previewArmLeft" style="
+                            width: 8px;
+                            height: 20px;
+                            background: <?php echo esc_attr($settings['avatar_skin_color']); ?>;
+                            position: absolute;
+                            top: 34px;
+                            left: 0;
+                        "></div>
+                        <div id="previewArmRight" style="
+                            width: 8px;
+                            height: 20px;
+                            background: <?php echo esc_attr($settings['avatar_skin_color']); ?>;
+                            position: absolute;
+                            top: 34px;
+                            right: 0;
+                        "></div>
+                        <div id="previewLegLeft" style="
                             width: 12px;
                             height: 20px;
                             background: <?php echo esc_attr($settings['avatar_leg_color']); ?>;
@@ -1785,7 +1790,7 @@ class AI_Avatar_Buddy {
                             bottom: 0;
                             left: 6px;
                         "></div>
-                        <div style="
+                        <div id="previewLegRight" style="
                             width: 12px;
                             height: 20px;
                             background: <?php echo esc_attr($settings['avatar_leg_color']); ?>;
@@ -1795,7 +1800,7 @@ class AI_Avatar_Buddy {
                         "></div>
                     </div>
                 </div>
-                <div style="
+                <div id="previewBubble" style="
                     margin-top: 20px;
                     padding: 10px;
                     background: <?php echo esc_attr($settings['bubble_bg_color']); ?>;
@@ -1805,9 +1810,9 @@ class AI_Avatar_Buddy {
                     font-family: 'Courier New', monospace;
                     font-size: <?php echo intval($settings['bubble_font_size']); ?>px;
                 ">
-                    <?php echo esc_html($settings['greeting_message']); ?>
+                    <span id="previewGreetingText"><?php echo esc_html($settings['greeting_message']); ?></span>
                 </div>
-                <button style="
+                <button id="previewButton" style="
                     margin-top: 10px;
                     width: 100%;
                     background: <?php echo esc_attr($settings['button_bg_color']); ?>;
@@ -1817,14 +1822,21 @@ class AI_Avatar_Buddy {
                     font-family: 'Courier New', monospace;
                     font-size: <?php echo intval($settings['button_font_size']); ?>px;
                     cursor: pointer;
-                "><?php echo esc_html($settings['option_say_hello']); ?></button>
+                "><span id="previewButtonText"><?php echo esc_html($settings['option_say_hello']); ?></span></button>
             </div>
         </div>
         
         <script>
         jQuery(document).ready(function($) {
-            // Initialize color pickers
-            $('.aab-color-picker').wpColorPicker();
+            // Initialize color pickers with live preview
+            $('.aab-color-picker').wpColorPicker({
+                change: function(event, ui) {
+                    updatePreview();
+                },
+                clear: function() {
+                    updatePreview();
+                }
+            });
             
             // Tab switching
             $('.aab-tab').on('click', function() {
@@ -1870,6 +1882,87 @@ class AI_Avatar_Buddy {
             
             // Initialize data-selected attribute
             $('#enabled_pages').attr('data-selected', $('#enabled_pages').val());
+            
+            // Real-time preview updates
+            function updatePreview() {
+                // Avatar colors
+                const skinColor = $('input[name="avatar_skin_color"]').val();
+                const skinShadow = $('input[name="avatar_skin_shadow"]').val();
+                const eyeColor = $('input[name="avatar_eye_color"]').val();
+                const mouthColor = $('input[name="avatar_mouth_color"]').val();
+                const torsoColor = $('input[name="avatar_torso_color"]').val();
+                const torsoShadow = $('input[name="avatar_torso_shadow"]').val();
+                const legColor = $('input[name="avatar_leg_color"]').val();
+                
+                // Update avatar parts
+                $('#previewHead').css({
+                    'background': skinColor,
+                    'box-shadow': '0 -4px 0 0 ' + skinShadow + ', -4px 0 0 0 ' + skinShadow + ', 4px 0 0 0 ' + skinShadow
+                });
+                $('#previewEyeLeft, #previewEyeRight').css('background', eyeColor);
+                $('#previewMouth').css('background', mouthColor);
+                $('#previewTorso').css({
+                    'background': torsoColor,
+                    'box-shadow': '-4px 0 0 0 ' + torsoShadow + ', 4px 0 0 0 ' + torsoShadow
+                });
+                $('#previewArmLeft, #previewArmRight').css('background', skinColor);
+                $('#previewLegLeft, #previewLegRight').css('background', legColor);
+                
+                // Bubble styling
+                const bubbleBg = $('input[name="bubble_bg_color"]').val();
+                const bubbleBorder = $('input[name="bubble_border_color"]').val();
+                const bubbleText = $('input[name="bubble_text_color"]').val();
+                const bubbleFontSize = $('input[name="bubble_font_size"]').val();
+                const bubbleBorderWidth = $('input[name="bubble_border_width"]').val();
+                const bubbleBorderRadius = $('input[name="bubble_border_radius"]').val();
+                
+                $('#previewBubble').css({
+                    'background': bubbleBg,
+                    'border': bubbleBorderWidth + 'px solid ' + bubbleBorder,
+                    'border-radius': bubbleBorderRadius + 'px',
+                    'color': bubbleText,
+                    'font-size': bubbleFontSize + 'px'
+                });
+                
+                // Button styling
+                const buttonBg = $('input[name="button_bg_color"]').val();
+                const buttonText = $('input[name="button_text_color"]').val();
+                const buttonBorder = $('input[name="button_border_color"]').val();
+                const buttonFontSize = $('input[name="button_font_size"]').val();
+                const buttonPaddingV = $('input[name="button_padding_vertical"]').val();
+                const buttonPaddingH = $('input[name="button_padding_horizontal"]').val();
+                
+                $('#previewButton').css({
+                    'background': buttonBg,
+                    'color': buttonText,
+                    'border': '2px solid ' + buttonBorder,
+                    'font-size': buttonFontSize + 'px',
+                    'padding': buttonPaddingV + 'px ' + buttonPaddingH + 'px'
+                });
+                
+                // Avatar size
+                const avatarSize = $('input[name="avatar_size"]').val();
+                $('#previewAvatarContainer').css({
+                    'width': avatarSize + 'px',
+                    'height': avatarSize + 'px'
+                });
+                
+                // Text updates
+                const greetingMsg = $('input[name="greeting_message"]').val();
+                const sayHelloText = $('input[name="option_say_hello"]').val();
+                
+                $('#previewGreetingText').text(greetingMsg);
+                $('#previewButtonText').text(sayHelloText);
+            }
+            
+            // Attach live update to all relevant inputs
+            $('input[name="avatar_skin_color"], input[name="avatar_skin_shadow"], input[name="avatar_eye_color"], input[name="avatar_mouth_color"], input[name="avatar_torso_color"], input[name="avatar_torso_shadow"], input[name="avatar_leg_color"]').on('input change', updatePreview);
+            
+            $('input[name="bubble_bg_color"], input[name="bubble_border_color"], input[name="bubble_text_color"], input[name="bubble_font_size"], input[name="bubble_border_width"], input[name="bubble_border_radius"]').on('input change', updatePreview);
+            
+            $('input[name="button_bg_color"], input[name="button_text_color"], input[name="button_border_color"], input[name="button_font_size"], input[name="button_padding_vertical"], input[name="button_padding_horizontal"]').on('input change', updatePreview);
+            
+            $('input[name="avatar_size"], input[name="greeting_message"], input[name="option_say_hello"]').on('input change', updatePreview);
         });
         </script>
         <?php
