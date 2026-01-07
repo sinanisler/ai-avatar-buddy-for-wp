@@ -629,6 +629,38 @@ class AI_Avatar_Buddy {
                 border-color: var(--button-hover-border);
             }
 
+            .bubble-close-x {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                width: 24px;
+                height: 24px;
+                cursor: pointer;
+                opacity: 0.6;
+                transition: opacity 0.2s;
+                z-index: 10;
+            }
+
+            .bubble-close-x:hover {
+                opacity: 1;
+            }
+
+            .bubble-close-x::before,
+            .bubble-close-x::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 16px;
+                height: 2px;
+                background: var(--bubble-text-color);
+                transform: translate(-50%, -50%) rotate(45deg);
+            }
+
+            .bubble-close-x::after {
+                transform: translate(-50%, -50%) rotate(-45deg);
+            }
+
             .state-indicator {
                 position: fixed;
                 bottom: 5px;
@@ -672,6 +704,7 @@ class AI_Avatar_Buddy {
                 </div>
             </div>
             <div class="speech-bubble" id="speechBubble">
+                <div class="bubble-close-x" id="bubbleCloseX"></div>
                 <div class="speech-text" id="speechText"></div>
                 <div class="speech-options" id="speechOptions"></div>
             </div>
@@ -766,17 +799,30 @@ class AI_Avatar_Buddy {
                 
                 init() {
                     this.container.addEventListener('click', (e) => {
-                        if (e.target.closest('.option-btn') || e.target.closest('.custom-input')) return;
-                        
+                        if (e.target.closest('.option-btn') || e.target.closest('.custom-input') || e.target.closest('.bubble-close-x')) return;
+
                         const now = Date.now();
                         if (now - this.lastClickTime < 400) return;
                         this.lastClickTime = now;
-                        
+
                         this.handleAvatarClick();
                     });
-                    
+
+                    // Add X button click handler
+                    document.getElementById('bubbleCloseX').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.closeBubble();
+                    });
+
+                    // Add ESC key handler
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && this.currentState !== BUBBLE_STATE.IDLE) {
+                            this.closeBubble();
+                        }
+                    });
+
                     this.startWalking();
-                    
+
                     setTimeout(() => {
                         this.showGreeting();
                     }, CONFIG.initialGreetingDelay);
@@ -878,7 +924,6 @@ class AI_Avatar_Buddy {
                             <button class="option-btn" onclick="window.avatarCtrl.sayHello()">${CONFIG.optionSayHello}</button>
                             <button class="option-btn" onclick="window.avatarCtrl.askWho()">${CONFIG.optionWhoAreYou}</button>
                             <button class="option-btn" onclick="window.avatarCtrl.feedTokens()">${CONFIG.optionFeedTokens}</button>
-                            <button class="option-btn close-btn" onclick="window.avatarCtrl.closeBubble()">${CONFIG.optionClose}</button>
                         `;
                     } else {
                         this.speechText.textContent = CONFIG.returnPromptMessage;
@@ -895,8 +940,6 @@ class AI_Avatar_Buddy {
                                 </div>
                             `;
                         }
-                        
-                        html += `<button class="option-btn close-btn" onclick="window.avatarCtrl.closeBubble()">${CONFIG.optionClose}</button>`;
                         
                         this.optionsDiv.innerHTML = html;
                     }
@@ -926,7 +969,6 @@ class AI_Avatar_Buddy {
                     } else {
                         this.optionsDiv.innerHTML = `
                             <button class="option-btn continue-btn" onclick="window.avatarCtrl.showOptions()">Continue →</button>
-                            <button class="option-btn close-btn" onclick="window.avatarCtrl.closeBubble()">${CONFIG.optionClose}</button>
                         `;
                     }
                     
@@ -1003,21 +1045,21 @@ class AI_Avatar_Buddy {
                         console.error('API Error:', error);
                         this.setState(BUBBLE_STATE.OPTIONS);
                         this.speechText.textContent = "...Something broke. Try again?";
-                        this.optionsDiv.innerHTML = '<button class="option-btn close-btn" onclick="window.avatarCtrl.closeBubble()">' + CONFIG.optionClose + '</button>';
+                        this.optionsDiv.innerHTML = '';
                     }
                 }
                 
                 feedTokens() {
                     this.clearStateTimeout();
                     this.setState(BUBBLE_STATE.TOKEN_RESPONSE);
-                    
+
                     this.tokens += 10;
                     const responses = CONFIG.tokenResponses;
                     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
                     this.speechText.textContent = randomResponse + ` Total: ${this.tokens}`;
-                    this.optionsDiv.innerHTML = '<button class="option-btn close-btn" onclick="window.avatarCtrl.closeBubble()">' + CONFIG.optionClose + '</button>';
+                    this.optionsDiv.innerHTML = '';
                     this.showBubble();
-                    
+
                     this.stateTimeout = setTimeout(() => {
                         if (this.currentState === BUBBLE_STATE.TOKEN_RESPONSE) {
                             this.closeBubble();
