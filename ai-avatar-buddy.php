@@ -316,7 +316,10 @@ class AI_Avatar_Buddy {
             return;
         }
 
-        $settings = get_option($this->option_name, $this->get_default_settings());
+        // Merge saved settings with defaults to ensure all keys exist
+        $defaults = $this->get_default_settings();
+        $saved_settings = get_option($this->option_name, array());
+        $settings = wp_parse_args($saved_settings, $defaults);
 
         // Check if avatar is enabled
         if (empty($settings['enable_avatar'])) {
@@ -818,8 +821,8 @@ class AI_Avatar_Buddy {
                     customInputLabel: <?php echo json_encode($settings['custom_input_label']); ?>,
 
                     // Conversation History
-                    historyExchangesLimit: <?php echo intval($settings['history_exchanges_limit']); ?>,
-                    historyMaxStorage: <?php echo intval($settings['history_max_storage']); ?>,
+                    historyExchangesLimit: <?php echo isset($settings['history_exchanges_limit']) ? intval($settings['history_exchanges_limit']) : 10; ?>,
+                    historyMaxStorage: <?php echo isset($settings['history_max_storage']) ? intval($settings['history_max_storage']) : 50; ?>,
 
                     // System Prompts (Advanced)
                     sayHelloPrompt: <?php echo json_encode($settings['say_hello_prompt']); ?>,
@@ -1314,7 +1317,10 @@ class AI_Avatar_Buddy {
      * Settings page
      */
     public function settings_page() {
-        $settings = get_option($this->option_name, $this->get_default_settings());
+        // Merge saved settings with defaults to ensure all keys exist
+        $defaults = $this->get_default_settings();
+        $saved_settings = get_option($this->option_name, array());
+        $settings = wp_parse_args($saved_settings, $defaults);
         $presets = $this->get_personality_presets();
         
         if (isset($_POST['submit']) && check_admin_referer('ai_avatar_buddy_save_settings')) {
@@ -2028,7 +2034,7 @@ class AI_Avatar_Buddy {
 
                     <div class="aab-setting-row">
                         <label>History Context Limit (exchanges sent to AI)</label>
-                        <input type="number" name="history_exchanges_limit" value="<?php echo esc_attr($settings['history_exchanges_limit']); ?>" min="1" max="100">
+                        <input type="number" name="history_exchanges_limit" value="<?php echo esc_attr(isset($settings['history_exchanges_limit']) ? $settings['history_exchanges_limit'] : 10); ?>" min="1" max="100">
                         <p class="description">
                             Number of recent conversation exchanges to send as context to the AI (Default: 10).<br>
                             <strong>Higher values = Better memory but more tokens used.</strong><br>
@@ -2042,7 +2048,7 @@ class AI_Avatar_Buddy {
 
                     <div class="aab-setting-row">
                         <label>History Storage Limit (total exchanges stored)</label>
-                        <input type="number" name="history_max_storage" value="<?php echo esc_attr($settings['history_max_storage']); ?>" min="10" max="500">
+                        <input type="number" name="history_max_storage" value="<?php echo esc_attr(isset($settings['history_max_storage']) ? $settings['history_max_storage'] : 50); ?>" min="10" max="500">
                         <p class="description">
                             Maximum number of exchanges to keep in browser localStorage (Default: 50).<br>
                             This is the total conversation history stored locally. Only the most recent exchanges (based on "History Context Limit" above) are sent to the AI.<br>
