@@ -891,8 +891,7 @@ class AI_Avatar_Buddy {
                         if (CONFIG.enableCustomInput) {
                             html += `
                                 <div class="custom-input-wrapper">
-                                    <input type="text" class="custom-input" id="customInput" placeholder="${CONFIG.customInputLabel}">
-                                    <button class="option-btn continue-btn" onclick="window.avatarCtrl.sendCustomMessage()">Send →</button>
+                                    <input type="text" class="custom-input" id="customInput" placeholder="${CONFIG.customInputLabel}" onkeypress="if(event.key==='Enter') window.avatarCtrl.sendCustomMessage()">
                                 </div>
                             `;
                         }
@@ -943,7 +942,17 @@ class AI_Avatar_Buddy {
                 }
                 
                 async continueConversation() {
-                    this.showOptions();
+                    // If custom input is enabled, focus on it
+                    if (CONFIG.enableCustomInput) {
+                        const input = document.getElementById('customInput');
+                        if (input) {
+                            input.focus();
+                            return;
+                        }
+                    }
+
+                    // Otherwise, generate conversation suggestions
+                    await this.sendMessage("Suggest 3 brief, interesting things we could talk about. Keep it very short.", false);
                 }
                 
                 async sendCustomMessage() {
