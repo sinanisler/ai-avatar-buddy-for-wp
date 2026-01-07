@@ -1048,8 +1048,13 @@ class AI_Avatar_Buddy {
                     } elseif (is_numeric($default_value)) {
                         $new_settings[$key] = floatval($_POST[$key]);
                     } else {
-                        // Use wp_unslash to prevent escaping issues
-                        $new_settings[$key] = sanitize_text_field(wp_unslash($_POST[$key]));
+                        // Use sanitize_textarea_field for multiline fields to preserve newlines
+                        if (in_array($key, array('token_responses', 'custom_system_prompt'))) {
+                            $new_settings[$key] = sanitize_textarea_field(wp_unslash($_POST[$key]));
+                        } else {
+                            // Use wp_unslash to prevent escaping issues
+                            $new_settings[$key] = sanitize_text_field(wp_unslash($_POST[$key]));
+                        }
                     }
                 } else {
                     $new_settings[$key] = is_bool($default_value) ? false : $default_value;
