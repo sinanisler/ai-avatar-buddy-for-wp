@@ -917,7 +917,7 @@ class AI_Avatar_Buddy {
                 showOptions() {
                     this.clearStateTimeout();
                     this.setState(BUBBLE_STATE.OPTIONS);
-                    
+
                     if (!this.hasInteracted) {
                         this.speechText.textContent = CONFIG.firstPromptMessage;
                         this.optionsDiv.innerHTML = `
@@ -925,26 +925,11 @@ class AI_Avatar_Buddy {
                             <button class="option-btn" onclick="window.avatarCtrl.askWho()">${CONFIG.optionWhoAreYou}</button>
                             <button class="option-btn" onclick="window.avatarCtrl.feedTokens()">${CONFIG.optionFeedTokens}</button>
                         `;
+                        this.showBubble();
                     } else {
-                        this.speechText.textContent = CONFIG.returnPromptMessage;
-                        
-                        let html = `
-                            <button class="option-btn" onclick="window.avatarCtrl.continueConversation()">${CONFIG.optionContinueChatting}</button>
-                            <button class="option-btn" onclick="window.avatarCtrl.feedTokens()">${CONFIG.optionFeedTokens}</button>
-                        `;
-                        
-                        if (CONFIG.enableCustomInput) {
-                            html += `
-                                <div class="custom-input-wrapper">
-                                    <input type="text" class="custom-input" id="customInput" placeholder="${CONFIG.customInputLabel}" onkeypress="if(event.key==='Enter') window.avatarCtrl.sendCustomMessage()">
-                                </div>
-                            `;
-                        }
-                        
-                        this.optionsDiv.innerHTML = html;
+                        // After first interaction, generate contextual follow-up options
+                        this.generateFollowUpOptions();
                     }
-                    
-                    this.showBubble();
                 }
                 
                 showAnswer(answer) {
@@ -983,18 +968,98 @@ class AI_Avatar_Buddy {
                     await this.sendMessage("Introduce yourself as a pixel art character on a website. Keep it short.", true);
                 }
                 
-                async continueConversation() {
-                    // If custom input is enabled, focus on it
-                    if (CONFIG.enableCustomInput) {
-                        const input = document.getElementById('customInput');
-                        if (input) {
-                            input.focus();
-                            return;
-                        }
-                    }
+                async generateFollowUpOptions() {
+                    this.setState(BUBBLE_STATE.THINKING);
+                    this.speechText.innerHTML = '<span class="loading">' + CONFIG.generatingOptionsMessage + '</span>';
+                    this.optionsDiv.innerHTML = '';
+                    this.showBubble();
 
-                    // Otherwise, generate conversation suggestions
-                    await this.sendMessage("Suggest 3 brief, interesting things we could talk about. Keep it very short.", false);
+                    try {
+                        const response = await fetch(REST_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-WP-Nonce': window.aiAvatarBuddyConfig.nonce
+                            },
+                            body: JSON.stringify({
+                                prompt: "Generate exactly 3 short, engaging conversation starters or questions (each 2-5 words). Format: Just list them with line breaks, no numbers or bullets. Keep them casual and interesting.",
+                                type: 'continue'
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('API request failed');
+                        }
+
+                        const data = await response.json();
+
+                        if (data.success && data.answer) {
+                            this.setState(BUBBLE_STATE.OPTIONS);
+                            this.speechText.textContent = CONFIG.returnPromptMessage;
+
+                            // Parse the AI response to extract options
+                            const options = data.answer
+                                .split('\n')
+                                .map(line => line.trim())
+                                .filter(line => line.length > 0)
+                                .slice(0, 3); // Take first 3 options
+
+                            let html = '';
+                            options.forEach((option, index) => {
+                                // Clean up the option text (remove numbers, bullets, etc.)
+                                const cleanOption = option.replace(/^[\d\-\*\.\)]+\s*/, '');
+                                html += `<button class="option-btn" onclick="window.avatarCtrl.sendMessage('${cleanOption.replace(/'/g, "\\'")}', false)">${cleanOption}</button>`;
+                            });
+
+                            // Add custom input field if enabled
+                            if (CONFIG.enableCustomInput) {
+                                html += `
+                                    <div class="custom-input-wrapper">
+                                        <input type="text" class="custom-input" id="customInput" placeholder="${CONFIG.customInputLabel}" onkeypress="if(event.key==='Enter') window.avatarCtrl.sendCustomMessage()">
+                                    </div>
+                                `;
+                            }
+
+                            this.optionsDiv.innerHTML = html;
+
+                            // Focus on custom input after a short delay
+                            if (CONFIG.enableCustomInput) {
+                                setTimeout(() => {
+                                    const input = document.getElementById('customInput');
+                                    if (input) input.focus();
+                                }, 100);
+                            }
+                        } else {
+                            throw new Error('Invalid response');
+                        }
+
+                    } catch (error) {
+                        console.error('API Error:', error);
+                        // Fallback to simple options if generation fails
+                        this.setState(BUBBLE_STATE.OPTIONS);
+                        this.speechText.textContent = CONFIG.returnPromptMessage;
+
+                        let html = `
+                            <button class="option-btn" onclick="window.avatarCtrl.sendMessage('Tell me something interesting', false)">Tell me something interesting</button>
+                            <button class="option-btn" onclick="window.avatarCtrl.sendMessage('What can you help with?', false)">What can you help with?</button>
+                            <button class="option-btn" onclick="window.avatarCtrl.sendMessage('Surprise me', false)">Surprise me</button>
+                        `;
+
+                        if (CONFIG.enableCustomInput) {
+                            html += `
+                                <div class="custom-input-wrapper">
+                                    <input type="text" class="custom-input" id="customInput" placeholder="${CONFIG.customInputLabel}" onkeypress="if(event.key==='Enter') window.avatarCtrl.sendCustomMessage()">
+                                </div>
+                            `;
+                        }
+
+                        this.optionsDiv.innerHTML = html;
+                    }
+                }
+
+                async continueConversation() {
+                    // This method is now deprecated but kept for compatibility
+                    await this.generateFollowUpOptions();
                 }
                 
                 async sendCustomMessage() {
