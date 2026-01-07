@@ -343,13 +343,18 @@ class AI_Avatar_Buddy {
      * Render avatar HTML
      */
     public function render_avatar() {
+        // Don't render if Bricks builder is active
+        if (isset($_GET['bricks']) && $_GET['bricks'] === 'run') {
+            return;
+        }
+
         $settings = get_option($this->option_name, $this->get_default_settings());
-        
+
         // Check if avatar should display on this page
         if (!empty($settings['enabled_pages']) && $settings['enabled_pages'] !== 'all') {
             $enabled_pages = array_map('trim', explode(',', $settings['enabled_pages']));
             $current_page_id = get_queried_object_id();
-            
+
             if (!in_array($current_page_id, $enabled_pages) && !in_array('all', $enabled_pages)) {
                 return; // Don't render avatar on this page
             }
