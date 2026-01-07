@@ -48,7 +48,7 @@ class AI_Avatar_Buddy {
             // API Settings
             'api_key' => '',
             'api_url' => 'https://openrouter.ai/api/v1/chat/completions',
-            'api_model' => 'anthropic/claude-3.5-haiku',
+            'api_model' => 'google/gemini-2.5-flash-lite',
             'api_temperature' => 0.9,
             'api_max_tokens' => 180,
             
