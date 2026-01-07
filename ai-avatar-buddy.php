@@ -153,10 +153,14 @@ class AI_Avatar_Buddy {
             // Features
             'enable_custom_input' => true,
             'custom_input_label' => "Ask anything...",
-            
+
+            // Conversation History
+            'history_exchanges_limit' => 10, // Number of recent exchanges to send as context
+            'history_max_storage' => 50, // Maximum exchanges to store in localStorage
+
             // Page Display Control
             'enabled_pages' => '', // Comma-separated page IDs or 'all'
-            
+
             // Debug
             'debug_mode' => false
         );
@@ -813,6 +817,10 @@ class AI_Avatar_Buddy {
                     enableCustomInput: <?php echo $settings['enable_custom_input'] ? 'true' : 'false'; ?>,
                     customInputLabel: <?php echo json_encode($settings['custom_input_label']); ?>,
 
+                    // Conversation History
+                    historyExchangesLimit: <?php echo intval($settings['history_exchanges_limit']); ?>,
+                    historyMaxStorage: <?php echo intval($settings['history_max_storage']); ?>,
+
                     // System Prompts (Advanced)
                     sayHelloPrompt: <?php echo json_encode($settings['say_hello_prompt']); ?>,
                     whoAreYouPrompt: <?php echo json_encode($settings['who_are_you_prompt']); ?>,
@@ -891,27 +899,35 @@ class AI_Avatar_Buddy {
 
                     this.conversationHistory.push(entry);
 
-                    // Keep only last 50 entries to avoid localStorage limits
-                    if (this.conversationHistory.length > 50) {
-                        this.conversationHistory = this.conversationHistory.slice(-50);
+                    // Keep only last N entries to avoid localStorage limits
+                    if (this.conversationHistory.length > CONFIG.historyMaxStorage) {
+                        this.conversationHistory = this.conversationHistory.slice(-CONFIG.historyMaxStorage);
                     }
 
                     this.saveHistory();
 
                     if (CONFIG.debugMode) {
                         console.log('History updated:', entry);
+                        console.log('Total history entries:', this.conversationHistory.length);
                     }
                 }
 
                 getConversationContext() {
-                    // Get last 5 exchanges for context
-                    const recentHistory = this.conversationHistory.slice(-5);
+                    // Get last N exchanges for context based on settings
+                    const limit = CONFIG.historyExchangesLimit;
+                    const recentHistory = this.conversationHistory.slice(-limit);
+
                     if (recentHistory.length === 0) return '';
 
-                    let context = '\n\nPrevious conversation context:\n';
+                    let context = '\n\nPrevious conversation context (last ' + recentHistory.length + ' exchanges):\n';
                     recentHistory.forEach(entry => {
                         context += `User: ${entry.userMessage}\nAvatar: ${entry.avatarResponse}\n`;
                     });
+
+                    if (CONFIG.debugMode) {
+                        console.log('Sending context with', recentHistory.length, 'exchanges out of', this.conversationHistory.length, 'total');
+                        console.log('Context length:', context.length, 'characters');
+                    }
 
                     return context;
                 }
@@ -2003,6 +2019,39 @@ class AI_Avatar_Buddy {
                     <div class="aab-setting-row">
                         <label>Custom Input Placeholder</label>
                         <input type="text" name="custom_input_label" value="<?php echo esc_attr($settings['custom_input_label']); ?>">
+                    </div>
+
+                    <h2>Conversation History & Memory</h2>
+                    <p class="description" style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-left: 3px solid #2196f3;">
+                        <strong>💡 How it works:</strong> The avatar stores conversation history in the browser's localStorage and sends recent exchanges to the AI for context. This allows the AI to remember previous conversations and provide more relevant responses.
+                    </p>
+
+                    <div class="aab-setting-row">
+                        <label>History Context Limit (exchanges sent to AI)</label>
+                        <input type="number" name="history_exchanges_limit" value="<?php echo esc_attr($settings['history_exchanges_limit']); ?>" min="1" max="100">
+                        <p class="description">
+                            Number of recent conversation exchanges to send as context to the AI (Default: 10).<br>
+                            <strong>Higher values = Better memory but more tokens used.</strong><br>
+                            • 5 exchanges ≈ 200-500 tokens<br>
+                            • 10 exchanges ≈ 400-1000 tokens (recommended)<br>
+                            • 20 exchanges ≈ 800-2000 tokens<br>
+                            • 50 exchanges ≈ 2000-5000 tokens<br>
+                            Each exchange includes both the user's message and the avatar's response.
+                        </p>
+                    </div>
+
+                    <div class="aab-setting-row">
+                        <label>History Storage Limit (total exchanges stored)</label>
+                        <input type="number" name="history_max_storage" value="<?php echo esc_attr($settings['history_max_storage']); ?>" min="10" max="500">
+                        <p class="description">
+                            Maximum number of exchanges to keep in browser localStorage (Default: 50).<br>
+                            This is the total conversation history stored locally. Only the most recent exchanges (based on "History Context Limit" above) are sent to the AI.<br>
+                            <strong>Note:</strong> Higher values use more browser storage but allow for longer conversation history.
+                        </p>
+                    </div>
+
+                    <div class="aab-setting-row" style="background: #fff3cd; border-left: 3px solid #ffc107;">
+                        <p><strong>💡 Pro Tip:</strong> To clear all conversation history from your browser, open your browser's console (F12) and run: <code>localStorage.removeItem('aiAvatarBuddyHistory')</code></p>
                     </div>
 
                     <h2>AI System Prompts (Advanced)</h2>
