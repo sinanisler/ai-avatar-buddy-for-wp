@@ -1,9 +1,9 @@
-<?php    
+<?php     
 /** 
  * Plugin Name: AI Avatar Buddy for WordPress
  * Plugin URI: https://github.com/sinanisler/ai-avatar-buddy-for-wp
  * Description: Add an interactive AI-powered pixel art avatar buddy to your WordPress site. Features customizable appearance, multiple personality presets, and engaging conversations powered by AI.
- * Version: 0.6
+ * Version: 0.5
  * Author: sinanisler
  * Author URI: https://github.com/sinanisler
  * License: GPL v2 or later
