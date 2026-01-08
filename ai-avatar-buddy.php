@@ -5,7 +5,7 @@
  * Description: Add an interactive AI-powered pixel art avatar buddy to your WordPress site. Features customizable appearance, multiple personality presets, and engaging conversations powered by AI.
  * Version: 0.5
  * Author: sinanisler
- * Author URI: https://sinanisler.com
+ * Author URI: https://github.com/sinanisler
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: snn
